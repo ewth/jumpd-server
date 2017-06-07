@@ -1,0 +1,51 @@
+#!/bin/bash
+source $(dirname $BASH_SOURCE)/permissions
+if [ $? != 3 ]; then
+    source ./scripts/fail
+    exit 1
+fi
+echo "Initialising... "
+source ./scripts/functions
+jcheck
+source ./scripts/style
+jcheck
+source ./scripts/arguments
+source ./scripts/system
+jcheck
+source ./config
+jcheck
+source ./scripts/traps
+jcheck
+
+echo "Checking state..."
+already_installed=0
+if [ -f ./data/installed ]; then
+    already_installed=$(<./data/installed)
+    if [ "$already_installed" != "1" ]; then
+        already_installed=0
+    fi
+fi
+stage_start=0
+if [ -f ./data/stage ]; then
+    stage_start=$(< ./data/stage)
+    if ! [[ "${stage_start}" =~ '^[0-9]+$' ]]; then
+        stage_start=0
+    fi
+fi
+force_stage=""
+force_overwrite=""
+if [ "$force_install" != "1" ]; then
+    echo
+    source ./scripts/hacks
+    echo
+fi
+
+echo "Generating unique SID for no reason..."
+sid=$(openssl rand -base64 12)
+echo $sid > /tmp/jumpd.sid
+
+jumpd_finished=0
+declare -a jumpd_stages=("input" "misc" "user" "mysql" "php" "nginx" "composer" "laravel" "cleanup")
+declare -a stages_left=("${jumpd_stages[@]}")
+return 3
+

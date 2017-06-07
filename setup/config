@@ -1,0 +1,24 @@
+#!/bin/bash
+# Default values
+echo "Loading configuration..."
+setup_newuser="ewan"
+setup_servername="jumpd.net"
+setup_docroot="/var/www/jumpd/public"
+setup_root="/var/www"
+setup_sitedir="/var/www/sites"
+setup_mysql_user="dbuser"
+setup_phpver="7.0"
+
+# Force installation regardless of package detection
+force_install=0
+
+# Run auto install (unmanned)
+# Can be done via `-a 1` argument
+# Some things e.g. operating system check require additional overriding
+auto_install=1
+
+
+
+
+
+return 3

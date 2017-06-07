@@ -1,0 +1,91 @@
+#!/bin/bash
+source $(dirname $BASH_SOURCE)/permissions
+jinform "Installing Laravel..."
+
+parent_dir="$(dirname "$setup_docroot")"
+laravel_installed=0
+if [ -f $parent_dir/artisan ]; then
+    laravel_installed=1
+    if [ "$force_install" != "1" ]; then
+        tab
+        jinform "-> Already installed, skipping."
+        finishstage "laravel"
+        return 3
+    fi
+fi
+
+if ! jinstalled "composer"; then
+    jarn "Composer wasn't detected on system. Required to install Laravel properly."
+    return
+fi
+
+env_backup=0
+
+if [ "$laravel_installed" != "1" ] || [ "$force_overwrite" == 1 ]; then
+
+    if [ -f $setup_root/jumpd/.env ]; then
+        jinform "The file ${style_invert}${public_dir}/.env${style_uninvert} exists."
+        jinform "Backing up..."
+        env_backup=1
+        \cp ${setup_root}/jumpd/.env ./.env.backup --backup=t
+    fi
+
+    jinform "Acquiring target: $setup_root"
+    
+    # jinform "Creating directory ${parent_dir}..."
+    # mkdir -p $parent_dir
+    current_dir=$(pwd)
+    jinform "Changing to ${setup_root}..."
+    cd $setup_root
+    
+    if [ -d "jumpd" ]; then
+        jinform "Removing existing "jumpd" directory"
+        \rm -rf jumpd
+    fi
+    
+    jinform "Cloning site..."
+    jun "git clone ssh://git@bitbucket.org/Huebacca/jumpd.git"
+    
+    if [ ! -d "jumpd" ]; then
+        jinform "Couldn't clone git repo."
+        return
+    fi
+    jinform "Returning to ${current_dir}..."
+    cd $current_dir
+    # \cp -f -r ../laravel $parent_dir &> /dev/null
+
+    if [ "$env_backup" == 1 ] && [ -f ./.env.backup ]; then
+    jinform "Restoring .env.backup..."
+        \rm -f ${setup_root}/jumpd/.env
+        \mv -f ./.env.backup ${setup_root}/jumpd/.env
+    else
+        \mv ./laravel/.env ${setup_root}/jumpd/.env
+    fi
+fi
+
+
+jinform "Running composer install..."
+jomposer "install -d ${parent_dir}"
+jinform "Running composer update..."
+jomposer "update -d ${parent_dir}"
+
+jinform "Setting permissions..."
+# chown -R nginx:nginx ${parent_dir}
+find ${parent_dir} -type f -exec chmod 644 {} \;
+find ${parent_dir} -type d -exec chmod 755 {} \;
+jun "chown -R nginx:nginx ${parent_dir}"
+jun "chgrp -R nginx ${parent_dir}/storage ${parent_dir}/bootstrap/cache"
+jun "chmod -R ug+rwx ${parent_dir}/storage ${parent_dir}/bootstrap/cache"
+
+
+jinform "Running optimization..."
+jphp "${parent_dir}/artisan optimize"
+jinform "Clearing caches..."
+jphp "${parent_dir}/artisan cache:clear"
+jphp "${parent_dir}/artisan config:clear"
+jinform "Generating new app key..."
+jphp "${parent_dir}/artisan key:generate"
+jinform "Completed. Laravel installed."
+finishstage "laravel"
+
+return 3

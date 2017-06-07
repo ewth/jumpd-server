@@ -1,0 +1,143 @@
+#!/bin/bash
+source $(dirname $BASH_SOURCE)/permissions
+maria_installed=0
+if jinstalled "mysql" || jinstalled "mariadb"; then
+    maria_installed=1
+fi
+
+if [ "$maria_installed" == "1" ] && [ "$force_install" != "1" ]; then
+    jinform "MariaDB already installed, skipping over."
+    finishstage "mysql"
+    return 3
+fi
+
+jinstall "mariadb-server"
+
+if ! jinstalled "mysql" || ! jinstalled "mariadb"; then
+    jinform "DB installation failed."
+    return
+fi
+
+jinform "Starting mariadb service..."
+jun "systemctl start mariadb.service"
+jinform "Adding service to statrtup..."
+jun "systemctl enable mariadb.service"
+
+passwords_detected=0
+if [ "$maria_installed" == 1 ] || [ -f ~/mysqlpass.txt ] || [ -f ~/.my.cnf ]; then
+
+
+    jinform "MySQL passwords already configured."
+
+    mysql_root_pass=""
+    mysql_user_pass=""
+    jinform "Trying to determine passwords..."
+    files_found=0
+    if [ -f ~/mysqlpass.txt ]; then
+        mysql_root_pass="$(sed -n "s/root:\(.[^\n]*\)/\1/p" ~/mysqlpass.txt | head -n 1)"
+        mysql_user_pass="$(sed -n "s/${setup_mysql_user}:\(.[^\n]*\)/\1/p" ~/mysqlpass.txt | head -n 1)"
+        jinform "Root password from ~/mysqlpass.txt:"
+        tab
+        jinform "${mysql_root_pass}"
+        files_found=1
+    fi
+    if [ -f ~/.my.cnf ]; then
+        mysql_root_pass="$(sed -n "s/password=\(.[^\n]*\)/\1/p" ~/.my.cnf | head -n 1)"
+        jinform "Root password from ~/.my.cnf:"
+        tab
+        jinform "${mysql_root_pass} "
+        files_found=1
+
+    fi
+    if [ "$files_found" == "1" ]; then
+        jinform "Password detected for DB user root."
+        if [ -n "$mysql_user_pass" ]; then
+            jinform "Password detected for DB user."
+        else
+            jinform "New password assigned to ${setup_mysql_user}."
+            mysql_user_pass=$(openssl rand -base64 12)
+        fi
+        jinform "Trying password -> ${mysql_root_pass} <- for root..."
+        temp_password=$(openssl rand -base64 12)
+        if jsql_password "root" "${mysql_root_pass}"; then
+            jinform "Success! Password matches. Continuing..."
+            passwords_detected=1
+        else
+            jinform "Incorrect password."
+        fi
+    fi
+    
+    if [ "$passwords_detected" != "1" ]; then
+        jarn "Could not determine MySQL passwords."
+        jinform "MySQL passwords already set. Unable to continue."
+        jinform "You will have to manually configure MariaDB."
+        jinform "See notes/db-password.txt for a how-to."
+        finishstage "mysql"
+        return 3
+    fi
+fi
+
+if [ -z "$mysql_root_pass" ]; then
+    jinform "Generating new root password..."
+    mysql_root_pass=$(openssl rand -base64 12)
+    if [ "$passwords_detected" == "1" ]; then
+        jinform "A blank root password was detected. Changing..."
+        if jsql_pass_change "root" "$mysql_root_pass" ""; then
+            jinform "Password successfully changed."
+        else
+            jarn "Error changing password. Unable to continue."
+            return
+        fi
+    fi
+fi
+if [ -z "${mysql_user_pass}" ]; then
+    jinform "Generating new user password..."
+    mysql_user_pass=$(openssl rand -base64 12)
+fi
+
+if [ -z "$mysql_root_pass" ]; then
+    jinform "Blank MySQL password. This is probably going to fail." "${col_red}"
+fi
+
+jinform "Saved to ~/mysqlpass.txt"
+date >> ~/mysqlpass.txt
+echo "root:${mysql_root_pass}" >> ~/mysqlpass.txt
+echo "${setup_mysql_user}:${mysql_user_pass}" >> ~/mysqlpass.txt
+if [ "$passwords_detected" != "1" ]; then
+    jinform "Assigning root password..."
+    # jandle "$(mysqladmin --user=root --password="${mysql_root_pass
+    jsql_pass_change "root" "${mysql_root_pass}" ""
+fi
+
+if ! jsql_password "root" "${mysql_root_pass}"; then
+    jarn "Password not set correctly."
+fi
+
+jinform 'Saving ~/.my.cnf...'
+cat << EOF > ~/.my.cnf
+[client]
+user=root
+password=${mysql_root_pass}
+EOF
+
+
+cat <<  EOF > ./mysql.sql
+USE mysql;
+UPDATE user SET password=PASSWORD('${mysql_root_pass}') WHERE user='root';
+DELETE FROM user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');
+DELETE FROM user WHERE User='';
+DELETE FROM db WHERE Db='test' OR Db='test\_%';
+FLUSH PRIVILEGES;
+CREATE USER '${setup_mysql_user}'@'localhost' IDENTIFIED BY '${mysql_user_pass}';
+GRANT ALL PRIVILEGES ON *.* TO '${setup_mysql_user}'@'localhost';
+EOF
+
+
+jinform "Running SQL import..."
+jsql "root" "${mysql_root_pass}" "--silent" "./mysql.sql"
+jinform "Removing temporary SQL..."
+\rm -f ./mysql.sql
+jinform "Restarting mariadb service..."
+systemctl restart mariadb.service
+jinform "Finished setting up database."
+finishstage "mysql"

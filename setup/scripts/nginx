@@ -1,0 +1,60 @@
+#!/bin/bash
+source $(dirname $BASH_SOURCE)/permissions
+
+if jinstalled "nginx"; then
+    if [ "$force_install" != "1" ]; then
+        jinform "-> Already installed, skipping over."
+        finishstage "nginx"
+        return 3
+    fi
+fi
+
+if ! php_jinstalled; then
+    jarn "PHP could not be found. Please ensure it is installed properly."
+    return
+fi
+
+jinstall nginx
+
+jinform "Initialising nginx service..."
+jun "systemctl start nginx"
+jinform "Adding nginx to autostart..."
+jun "systemctl enable nginx"
+jinform "Taking nginx offline..."
+jun "systemctl stop nginx"
+
+jinform "Creating sites directory: ${setup_sitedir}..."
+jun "mkdir -p $setup_sitedir"
+# jinform "Creating docroot: $docroot..."
+# jun "mkdir -p $setup_docroot"
+jinform "Setting permissions..."
+jun "chmod 666 /run/php-fpm/php-fpm.sock"
+jun "chown nginx:nginx /run/php-fpm/php-fpm.sock"
+# jun "chown -R nginx:nginx ${setup_docroot}"
+jun "chown -R nginx:nginx ${setup_sitedir}"
+
+jinform "Configuring nginx..."
+jun "mkdir -p /etc/nginx/sites-enabled"
+jun "mkdir -p /etc/nginx/sites-available"
+\cp -f nginx/site.conf /etc/nginx/sites-available/default.conf
+\cp -f nginx/site.conf /etc/nginx/sites-available/site.conf
+sed -i "s#{SITENAME}#${setup_servername}#g" /etc/nginx/sites-available/site.conf
+jun "ln -s /etc/nginx/sites-available/site.conf /etc/nginx/sites-enabled/site.conf"
+\cp -f nginx/nginx.conf /etc/nginx/nginx.conf
+sed -i "s#{DOCROOT}#${setup_docroot}#g" /etc/nginx/nginx.conf
+\cp -f nginx/php.conf /etc/nginx/conf.d/php.conf
+\cp -f nginx/location-php.conf /etc/nginx/default.d/php.conf
+jun "chown -R nginx:nginx /etc/nginx"
+
+# NB: All we do now is setup for Laravel, don't bother with test crap
+# jinform "Creating test files..."
+# \cp ./nginx/index.html $setup_docroot/index.html
+# \cp ./scripts/jumpd $setup_docroot/jumpd.txt
+# \cp ./nginx/jumpd.php $setup_docroot/jumpd.php
+# sed -i "s/{BODY}//" $setup_docroot/index.html
+# php "$setup_docroot/jumpd.php"
+# jinform "Bringing nginx online..."
+# jun "systemctl start nginx"
+jinform "Finished setting up nginx."
+finishstage "nginx"
+return 3

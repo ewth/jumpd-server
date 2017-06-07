@@ -1,0 +1,72 @@
+#!/bin/bash
+source $(dirname $BASH_SOURCE)/permissions
+echo "Checking orders..."
+# options:
+#   -f                  Force install mode
+#   -o                  Force overwrite mode
+#   -a                  Auto install mode
+#   -r                  Reset all stages and installation
+#   -s [stage]          Force stage
+#   -u [user]           Create user [name] for setup
+#   -m [mysqluser]      Setup MySQL with [mysqluser]
+#   -d [dir]            Set [dir] as docroot
+#   -p [version]        Install PHP version [version]
+#   -h                  Display this information
+while getopts "iahfou:s:m:d:p:" o; do
+    case "${o}" in
+        o)
+            echo "[Ignoring Operating System]"
+            ignore_os=1
+            ;;
+        s)
+            force_stage=${OPTARG}
+            force_install=1
+            echo "[Force stage: $force_stage]"
+            ;;
+        o)
+            force_overwrite=1
+            echo "[Force Overwrite mode]"
+            ;;
+        f)
+            echo "[Force install mode]"
+            force_install=1
+            ;;
+        r)
+            echo "0" > ./data/installation
+            echo "0" > ./data/stage
+            ;;
+        a)
+            echo "[Auto install mode]"
+            auto_install=1
+            ;;
+        u)
+            setup_newuser=${OPTARG}
+            ;;
+        m)
+            setup_mysql_user=${OPTARG}
+            ;;
+        d)
+            setup_docroot=${OPTARG}
+            ;;
+        p)
+            setup_phpver=${OPTARG}
+            ;;
+        h)
+            echo
+            echo "options:"
+            echo "   -i                  Force install mode"
+            echo "   -a                  Auto install mode"
+            echo "   -f [stage]          Force stage"
+            echo "   -u [user]           Create user [name] for setup"
+            echo "   -s [servername]     Set servername as [name]"
+            echo "   -m [mysqluser]      Setup MySQL with [mysqluser]"
+            echo "   -d [dir]            Set [dir] as docroot"
+            echo "   -p [version]        Install PHP version [version]"
+            echo "   -h                  Display this information and exit"
+            echo
+            exit
+            ;;
+    esac
+done
+shift $((OPTIND-1))
+return 3

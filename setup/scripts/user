@@ -1,0 +1,25 @@
+#!/bin/bash
+# Sets up new user
+source $(dirname $BASH_SOURCE)/permissions
+# usercheck=$(id -u $setup_newuser)
+if id "$setup_newuser" >/dev/null 2>&1; then
+    jinform "User $setup_newuser exists, skipping over."
+    finishstage "user"
+    return 3
+fi
+jinform "Setting up new user $setup_newuser..."
+adduser $setup_newuser
+jinform "Assigning random password...\n\t"
+echo $(openssl rand -base64 12) | passwd $setup_newuser --stdin > /dev/null
+usermod -aG wheel $setup_newuser
+jinform "Adding SSH key..."
+mkdir -p /home/$setup_newuser/.ssh
+cat ssh/public.key > /home/$setup_newuser/.ssh/authorized_keys
+chmod 700 /home/$setup_newuser/.ssh
+chmod 644 /home/$setup_newuser/.ssh/authorized_keys
+jinform "Setting user permissions..."
+chown -R $setup_newuser:$setup_newuser /home/$setup_newuser
+jinform "Finished adding user."
+finishstage "user"
+
+return 3

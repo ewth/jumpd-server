@@ -1,0 +1,33 @@
+#!/bin/bash
+source $(dirname $BASH_SOURCE)/permissions
+keys_exist=0
+jinform "Checking security..."
+if [ -f ~/.ssh/authorized_keys ]; then
+    authorized_keys=$(<~/.ssh/authorized_keys)
+    if [ "$authorized_keys" != "" ]; then
+        if grep --quiet 'ssh-rsa \(.[^\n]*\)' ~/.ssh/authorized_keys; then
+            keys_exist=1
+        fi
+    fi
+fi
+if [ "$keys_exist" != "1" ]; then
+    jinform "Keys could not be found. Please fix this before continuing."
+    return
+fi
+jinform "Modifying security settings..."
+if [ ! -f /etc/ssh/sshd_config.backup ]; then
+    cp /etc/ssh/sshd_config /etc/ssh/sshd_config.backup
+fi
+jinform "Enabling key authentication..."
+sed -i 's/#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd_config
+jinform "Disabling password authentication..."
+sed -i 's/PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
+jinform "Assigning secure password to account..."
+newpass=$(openssl rand -base64 12)
+jandle "$(echo $newpass | passwd $USER --stdin)"
+jinform "Restarting sshd..."
+jun "systemctl restart sshd"
+jinform "Finished tightening security."
+finishstage "security"
+
+return 3

@@ -1,0 +1,53 @@
+#!/bin/bash
+source $(dirname $BASH_SOURCE)/permissions
+if [ "$auto_install" != "1" ]; then
+    if [ -z "$input_newuser" ]; then
+        read -p "User to add [$setup_newuser]: " input_newuser
+    fi
+    #
+    if [ -z "$input_mysql_user" ]; then
+        read -p "Database user [$setup_mysql_user]: " input_mysql_user
+    fi
+    #
+    if [ -z "$input_phpver" ]; then
+        read -p "PHP version 5.4/5.6/7.0/7.1 [$setup_phpver]: " input_phpver
+    fi
+    #
+    if [ ! -z "$input_newuser" ]; then
+        setup_newuser="$input_newuser"
+    fi
+    #
+    if [ ! -z "$input_servername" ]; then
+        setup_servername="$input_servername"
+    fi
+    #
+    if [ ! -z "$input_mysql_user" ]; then
+        setup_mysql_user="$input_mysql_user"
+    fi
+    #
+    if [ ! -z "$input_docroot" ]; then
+        setup_docroot="$input_docroot"
+    fi
+    #
+    if [ ! -z "$input_phpver" ]; then
+        setup_phpver="$input_phpver"
+    fi
+fi
+
+jinform "Setting up with details:"
+jinform "  User: $setup_newuser"
+jinform "  Servername: $setup_servername"
+jinform "  DB user: $setup_mysql_user"
+jinform "  Docroot: $setup_docroot"
+jinform "  Sites directory: $setup_sitedir"
+jinform "  PHP version: $setup_phpver"
+jinform 
+
+if [ "$auto_install" != "1" ]; then
+    jinform "Press Ctrl+C to quit or enter to continue."
+    read
+fi
+
+jinform "Here we go..."
+finishstage "input"
+return 3

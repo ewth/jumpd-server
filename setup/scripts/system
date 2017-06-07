@@ -1,0 +1,27 @@
+#!/bin/bash
+source $(dirname $BASH_SOURCE)/permissions
+echo "Analysing system..."
+os=$(rpm -qa \*-release | grep "centos" | cut -d "-" -f1,3)
+if [ "$os" == "centos-7" ]; then
+    jinform "Delicious CentOS 7 tasted."
+    return 3
+fi
+
+jarn "Unfamiliar operating system detected."
+jinfo "This software has ONLY been tested on CentOS 7."
+jinfo "It is very strongly recommend you don't use it on your system."
+jinfo "As it runs with root access, it has the potentailly to completely"
+jinfo " ruin everything."
+if [ "$ignore_os" == "1" ]; then
+    jarn "Ignoring operating system. You are continuing at your own peril."
+    read -p "ARE YOU SURE? [Y/n]: " confirm
+    if [ "$confirm" != "Y" ] && [ "$confirm" != "y" ]; then
+        echo "Good choice."
+        exit 1
+    fi
+    echo "Good luck friend."
+    return 3
+fi
+tab
+jinfo "But if you must *sigh*"
+jinfo "Run with the -o options to override the OS check."

@@ -1,0 +1,16 @@
+#!/bin/bash
+source $(dirname $BASH_SOURCE)/permissions
+jinform "chroot configuration isn't ready to use yet, bypassing."
+finishstage "chroot"
+return 3
+
+jinform "Setting up chroot jail..."
+D=/nginx
+mkdir -p $D/{usr/local/nginx,etc,dev,var/tmp,tmp}
+jandle "$(chmod 1777 $D/var/tmp)"
+jandle "$(chmod 1777 $D/tmp)"
+jandle "$(ls -l /dev/{null,random,urandom})"
+jandle "$(mknod -m 0666 $D/dev/null c 1 3)"
+jandle "$(mknod -m 0666 $D/dev/random c 1 8)"
+jandle "$(mknod -m 0444 $D/dev/urandom c 1 9)"
+jandle "$(\cp -farv /usr/local/nginx/* $D/usr/local/nginx)"

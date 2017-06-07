@@ -1,0 +1,23 @@
+#!/bin/bash
+source $(dirname $BASH_SOURCE)/permissions
+jinform "Setting up swap..."
+if [ -f /swapfile ]; then
+    jinform "Swap file appears to exist, skipping over." 2
+else
+    jun "fallocate -l 2G /swapfile"
+    jun "chmod 600 /swapfile"
+    jun "mkswap /swapfile"
+    jun "swapon /swapfile"
+    echo "# Swapfile added by jumpd-server" >> /etc/fstab
+    echo "/swapfile   swap    swap    sw  0   0" >> /etc/fstab
+fi
+
+
+jinstall nano
+jinform "Installing Extra Packages..."
+jinstall "epel-release"
+jinform "Adding Webtatic packages..."
+jandle "$(rpm -Uh https://mirror.webtatic.com/yum/el7/webtatic-release.rpm --quiet 2>/dev/null)"
+jinform "Misc tasks complete."
+finishstage "misc"
+return 3

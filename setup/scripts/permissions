@@ -1,0 +1,39 @@
+#!/bin/bash
+
+# Provide a common interface to exit gracefully
+
+ex=$(basename "$0")
+if [ "${ex}" != "jumpd.sh" ]; then
+
+    tab="    "
+    echo -e "${col_white}${bg_red}"
+    echo
+    echo -e "${tab}NOPE"
+    echo -e "${bg_none}"
+    echo -e "${col_yellow}${tab}${ex}${col_white}"
+    echo -e "${tab}This script should not be executed directly."
+    echo -e "${tab}Run ${col_green}bash ~/jumpd-server/jumpd.sh${col_white} instead.${style_none}"
+    echo
+    if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
+        exit 126
+    fi
+    return
+
+fi
+
+if [[ $EUID -ne 0 ]]; then
+    tab="    "
+    echo -e "${col_white}${bg_red}"
+    echo
+    echo -e "${tab}NOPE"
+    echo -e "${bg_none}"
+    echo -e "${col_yellow}${tab}${USR}${col_white}"
+    echo -e "${tab}jumpd-server requires ${col_green}root${col_white} to install.${style_none}"
+    echo
+    if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
+        exit 126
+    fi
+    return
+fi
+
+return 3

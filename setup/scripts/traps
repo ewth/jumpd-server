@@ -1,0 +1,12 @@
+#!/bin/bash
+source $(dirname $BASH_SOURCE)/permissions
+
+echo "Laying traps..."
+trap kill_jumpd SIGTSTP
+trap kill_jumpd SIGTTIN
+trap kill_jumpd SIGTTOU
+trap kill_jumpd SIGTERM 
+trap kill_jumpd SIGQUIT
+trap kill_jumpd SIGINT
+
+return 3

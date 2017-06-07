@@ -1,0 +1,132 @@
+#!/bin/bash
+source $(dirname $BASH_SOURCE)/permissions
+packages=""
+base=""
+guess=0
+if [ "$setup_phpver" == "5.6" ]; then
+        jinform "Preparing PHP5.6..."
+       base=56
+fi
+
+if [ "$setup_phpver" == "7.0" ]; then
+        jinform "Preparing PHP7.0..."
+        base="70w"
+fi
+
+if [ "$setup_phpver" == "7.1" ]; then
+        jinform "Preparing PHP7.1..."
+        jarn "Compatibility issues! PHP7.1 doesn't go too well on CentOS 7 wiht nginx."
+        jinform "Installing anyway..."
+        base="71w"
+fi
+
+if [ -z "$base" ]; then
+    if [[ "$setup_phpver" =~ ([0-9])\.([0-9]*) ]]; then
+        jinform "Trying PHP${BASH_REMATCH[1]}.${BASH_REMATCH[2]}, hold on tight..."
+        base=${BASH_REMATCH[1]}${BASH_REMATCH[2]}
+        guess=1
+    else
+        if [[ "$setup_phpver" =~ ([0-9]) ]]; then
+            jinform "Trying PHP${BASH_REMATCH[1]}.0, hold on tight..."
+            base="${BASH_REMATCH[1]}0"
+            guess=1
+        fi
+    fi
+fi
+
+if [ -z "$base" ]; then
+    jinform "Preparing default PHP version..."
+fi
+
+php_installed=0
+
+jinform "Attempting to detect PHP..."
+if php_jinstalled; then
+   php_installed=1
+fi
+
+
+php_jackages
+
+if [ "$php_installed" == 1 ]; then
+    jinform "PHP installation detected."
+    if [ "$force_install" != "1" ]; then
+        tab
+        jinform " -> Already installed, skipping."
+        finishstage "php"
+        return 3
+    fi
+else
+    jinform "PHP installation not found."
+fi
+
+jinform "Packages slated:"
+tab
+jinform "$packages"
+php_installed=0
+php_skip_broken=0
+if php_jinstall; then
+    php_installed=1
+    jinform "Success!"
+else
+    jinform "Couldn't be installed."
+    if [ "$guess" == "1" ]; then
+        jinform "Trying Webtatic version: ${base} -> ${base}${col_red}w" 
+        base="${base}w"
+        if php_jinstall; then
+            jinform "Success!"
+            php_installed=1
+        else
+            jinform "Webtatic version couldn't be installed either."
+        fi
+    fi
+fi
+
+if [ "$php_installed" != "1" ] && [ "$php_skip_broken" != "1" ]; then
+    php_skip_broken=1
+    jinform "Attempting with --skip-broken"
+    php_jinstall
+    if php_jinstall; then
+        php_installed=1
+        jinform "Success!"
+    fi
+fi
+
+if [ "$php_installed" != "1" ]; then
+    jinform "PHP installation failed."
+    return
+fi
+
+jinform "Finished PHP installation."
+
+jinstall crudini
+
+jinform "Configuring PHP..."
+if [ ! -f /etc/php.ini.original ]; then
+    \cp /etc/php.ini /etc/php.ini.original &> /dev/null
+fi
+# sed -i 's/\([;]*\)\?cgi.fix_pathinfo=\([0-9]*\)/cgi.fix_pathinfo=0/g' /etc/php.ini
+crudini --set /etc/php.ini PHP cgi.fix_pathinfo 0
+crudini --set /etc/php.ini PHP expose_php Off
+crudini --set /etc/php.ini PHP display_errors Off
+crudini --set /etc/php.ini PHP log_errors On
+crudini --set /etc/php.ini PHP allow_url_include Off
+crudini --set /etc/php.ini PHP post_max_size 128K
+crudini --set /etc/php.ini SQL sql.safe_mode On
+
+crudini --set /etc/php.ini PHP allow_url_fopen On
+
+#\cp -f ./php/php.ini /etc/php.ini
+\cp ./php.d/security.ini /etc/php.d/security.ini
+if [ ! -f /etc/php-fpm.d/www.conf.original ]; then
+    \cp /etc/php-fpm.d/www.conf /etc/php-fpm.d/www.conf.original &> /dev/null
+fi
+\cp -f ./php-fpm/www.conf /etc/php-fpm.d/www.conf
+
+jinform "Restarting php-fpm..."
+jun "systemctl restart php-fpm"
+jinform "Removing crudini..."
+yum erase -y crudini &> /dev/null
+jinform "PHP installation complete."
+finishstage "php"
+return 3

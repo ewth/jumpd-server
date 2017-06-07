@@ -1,0 +1,325 @@
+#!/bin/bash
+#
+# When I wrote this bunch of scripts, I'd fractured my spine and was on very
+# heavy pain meds. No excuses, I stand by my work, just understand the headspace
+# I was in when coming up with some of the function names, processes, etc.
+#
+#
+# Oh look, a cloud.
+#
+#
+source $(dirname $BASH_SOURCE)/permissions
+function jstat() {
+    jstatcheck
+    status=1
+    echo "${1}..."
+}
+function jstatdone() {
+    status=0
+}
+function jstatcheck() {
+    if [ "$status" == "1" ]; then
+        jarn "Something failed. Exiting."
+        exit
+    fi
+}
+function jcheck() {
+    exitcode=$?
+    lastran=$_
+    if [ -n "$1" ]; then
+        if [ "$1" == "yes" ]; then
+            exitcode=$2
+        fi
+    fi
+    if [ "$exitcode" != "3" ]; then
+        jarn "Failure loading ${lastran}"
+        exit
+    fi
+    exitcode=0
+}
+function jarn() {
+    echo -e "${bg_red}"
+    echo
+    tab
+    echo -e "WARNING"
+    echo -e "${bg_none}"
+    echo
+    tab
+    echo -e "${col_red}${1}"
+    echo -e "${style_none}"
+}
+function jumpd() {
+    jumpd=$(<scripts/jumpd)
+    echo -e "${bg_blue}"
+    echo
+    echo "$jumpd"
+    echo -e "${style_none}"
+    echo
+}
+
+function jio() {
+    exec 2>&1;
+}
+function jomposer() {
+    { jio; composer $1 1>&2; } | jandlein
+}
+function jphp() {
+    { jio; php $1 1>&2; } | jandlein
+}
+function jsql() {
+    { jio; mysql -u "$1" --password="$2" $3 1>&2 < $4; } | jandlein
+}
+# user new_password old_password
+function jsql_pass_change() {
+    cmd="mysqladmin -u "$1" password "$2" --password="$3""
+    tab
+    jinform "Trying: ${cmd}"
+    result=$(${cmd} 2>&1)
+    return $?
+}
+function jsql_password() {
+    cmd="mysql -u "$1" --password="$2" -e"quit""
+    result=$(${cmd} 2>&1)
+    return $?
+}
+
+
+function jun() {
+    input="${1}"
+    output="$(${input} 2>&1)"
+    tab
+    tab
+    echo -e "${style_dim}${col_lgreen}${bg_black} ${line}${style_none}"
+}
+
+function jandlein() {
+    while read -r line; do
+        if [ -n "$line" ]; then
+            tab
+            tab
+            echo -e "${style_dim}${col_lgreen}${bg_black} ${line}${style_none}"
+        fi
+    done
+}
+
+
+function jandle() {
+    while read -r line; do
+        if [ -n "$line" ]; then
+            tab
+            tab
+            echo -e "${style_dim}${col_lgreen}${bg_black} ${line}${style_none}"
+        fi
+    done <<< "$1"
+}
+
+function tab() {
+    printf "    "
+}
+
+function jinform () {
+    output="$1"
+    if [ -z "$output" ]; then
+        return
+    fi
+    colour="${col_green}${bg_black}"
+    if [ -n "$2" ]; then
+        colour="${2}"
+    fi
+    tab
+    echo -e "${colour} ${output}${style_none}"
+}
+
+function jext() {
+    text="$1"
+    if [ -z "$2" ]; then
+        colour1=$(shuf -i 41-47 -n 1)
+        colour2=$(shuf -i 31-37 -n 1)
+        colour="\e[${colour2}m\e[${colour2}m"
+    else
+        colour="$2"
+    fi
+    echo -e "${colour}${text}${style_none}"
+}
+
+# tbc
+function jolour() {
+    string="${1}"
+    final=""
+    for (( i=0; i<${#string}; i++ )); do
+        item="${string:$i:1}"
+        colour=$(shuf -i 41-47 -n 1)
+        final="${final}\e[${colour}m${item}"
+    done
+    jolour="${final}${style_none}"
+}
+
+function jinstalled() {
+    if hash "$1" 2> /dev/null; then
+        true
+    else
+        if rpm -q "$1" > /dev/null 2>&1; then
+            true
+        else
+            false
+        fi
+    fi
+}
+
+function php_jackages() {
+    packages="php${base} php${base}-cli php${base}-fpm php${base}-opcache php${base}-common php${base}-mysqlnd php${base}-mbstring php${base}-dom"
+}
+
+
+# PHP is a dick to detect sometimes
+function php_detect() {
+    php_detected=0
+    php_jackages
+    if rpm -q $packages >/dev/null 2>&1; then
+        return
+    fi
+    if jinstalled "php"; then
+        return
+    fi
+    test=$(php -r 2>&1 > /dev/null)
+    return $?
+}
+
+function php_jinstalled() {
+    if php_detect; then
+        true
+    else
+        false
+    fi
+}
+
+function php_jinstall() {
+    php_jackages
+    if [ "$php_skip_broken" == "1" ]; then
+        jun "yum -q -y install $packages --skip-broken"
+    else
+        jun "yum -q -y install $packages"
+    fi
+    return $(php_jinstalled)
+}
+
+function jinstall {
+    installed=false
+    jinform "Installing $1..."
+    if jinstalled $1; then
+        if [ "$force_install" != "1" ]; then
+            tab
+            jinform " -> Already installed, skipping."
+            installed=true
+            return
+        fi
+    fi
+    jun "yum -y -q install $1"
+}
+
+function kill_jumpd() {
+    echo -e "${col_white}${bg_red}"
+    echo
+    tab
+    echo "Interrupted... how rude!"
+    tab
+    echo "Trying to leave gracefully..."
+    echo -e "${style_none}"
+    echo "And we're out."
+    exit 1
+}
+
+
+function jumpd_fail () {
+    echo -e "${col_white}"
+    echo -e "${bg_red}"
+    echo -e "${col_white}${bg_red}"
+    tab
+    echo -e "${style_underline}FML${style_ununderline}"
+    echo -e "${bg_none}"
+    echo -e "${bg_none}${col_none}"
+    echo
+    tab
+    echo -e "Stage ${col_red}${current_stage}${col_none} failed."
+    tab
+    echo -e "Last stage completed: ${col_green}${last_stage}${col_none}"
+    tab
+    echo -e "Stages remaining: ${col_yellow}${stages_left[@]}"
+    tab
+    echo -e "${style_none}"
+    echo
+    echo "Try again :("
+    echo
+    exit 1
+    
+}
+
+function dostages () {
+    if [ "${stage_start}" == "" ]; then
+        stage_start=0
+    fi
+    if [ -n "${force_stage}" ]; then
+        for (( i=0; i<${#jumpd_stages[@]}; i++ )); do
+            current_stage=${jumpd_stages[$i]}
+            if [ "${force_stage}" == "${current_stage}" ]; then
+                stage_start=${i}
+            fi
+        done
+    fi
+    stage_count=${#jumpd_stages[@]}
+    if [ "${stage_start}" != 0 ]; then
+        stage_start_no=$(($i+1))
+        echo -e "${bg_dgray} Jumping to stage ${stage_start_no}${style_none}"
+    fi
+    for (( i=${stage_start}; i<${stage_count}; i++ )); do
+        echo "${i}" > ./data/stage
+        current_stage=${jumpd_stages[$i]}
+        stage_no=$(($i+1))
+        if [ -z "${force_stage}" ] || [ "${force_stage}" == "${current_stage}" ]; then
+            runstage "$current_stage" "$stage_no" "$stage_count"
+            if [ ${stage_complete} != "1" ] || [ "${last_stage}" != "${current_stage}" ]; then
+                jumpd_finished=0
+                return
+            fi
+        else
+            echo -e "${bg_dgray} Skipping ${current_stage}${style_none}"
+        fi
+        unset stages_left[$i]
+    done
+    jumpd_finished=1
+}
+
+function runstage() {
+    echo -e "${col_yellow}"
+    echo -e "Stage ${2}/${3}:${col_cyan} ${1}${style_none}"
+    stage_complete=0
+    if [ -f ./scripts/${1} ]; then
+        source ./scripts/${1}
+    else
+        jarn "No script for ${col_yellow}${1}${style_none}"
+    fi
+}
+function finishstage() {
+    last_stage=$1
+    stage_complete=1
+    echo
+    tab
+    echo -e "${col_magenta}Finished stage ${col_cyan}${current_stage}${style_none}"
+    echo
+}
+function startbanner() {
+    jumpd
+    return
+    echo -e "${bg_blue}"
+    printf "\n\t"
+    echo -e "${style_invert}JUMPD.NET${style_uninvert} server configuration suite"
+    echo -e "${style_none}"
+    echo
+}
+function endbanner() {
+    echo -e "${bg_blue}"
+    printf "\n\t"
+    echo -e "${style_invert}JUMPD.NET${style_uninvert} SERVER IS GO"
+    echo -e "${style_none}"
+}
+return 3

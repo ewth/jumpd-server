@@ -1,0 +1,39 @@
+#!/bin/bash
+source $(dirname $BASH_SOURCE)/permissions
+jinform "Installing composer..."
+if jinstalled "composer"; then
+    if [ "$force_install" != "1" ]; then
+        tab
+        jinform "-> Already installed, skipping."
+        finishstage "composer"
+        return 3
+    fi
+fi
+
+jinform "yum installation of composer skipped for now."
+#
+# jinform "Attempting to install via yum...."
+# jun "yum -y install composer"
+
+jinform "Downloading composer setup..."
+php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');" &> /dev/null
+if [ ! -f composer-setup.php ]; then
+    jinform "Error downloading installer script."
+    return
+fi
+jinform "Running installer..."
+jphp "composer-setup.php"
+if [ ! -f composer.phar ]; then
+    jinform "Error running composer installer script."
+    return
+fi
+jinform "Moving .phar..."
+\rm -f composer-setup.php
+jun "mv composer.phar /usr/local/bin/composer"
+if [ ! -f /usr/local/bin/composer ]; then
+    jinform "Failed to install composer correctly."
+    return 3
+fi
+jinform "Finished installing composer."
+finishstage "composer"
+return 3

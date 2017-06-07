@@ -1,0 +1,21 @@
+#!/bin/bash
+source $(dirname $BASH_SOURCE)/permissions
+jinform "Bringing services online..."
+systemctl stop nginx
+systemctl stop mariadb
+systemctl stop php-fpm
+systemctl start php-fpm
+tab
+jinform "php-fpm up."
+systemctl start mariadb
+tab
+jinform "mariadb/mysql up."
+systemctl start nginx
+tab
+jinform "nginx up."
+jinform "Cleaning up..."
+jun "yum -q clean all"
+\rm -f /tmp/jumpd.sid > /dev/null
+\rm -f /tmp/jumpd.stage > /dev/null
+finishstage "cleanup"
+return 3
